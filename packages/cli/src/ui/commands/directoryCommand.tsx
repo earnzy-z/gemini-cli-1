@@ -13,7 +13,10 @@ import { MultiFolderTrustDialog } from '../components/MultiFolderTrustDialog.js'
 import type { SlashCommand, CommandContext } from './types.js';
 import { CommandKind } from './types.js';
 import { MessageType } from '../types.js';
-import { expandHomeDir, finishAddingDirectories } from './directoryUtils.js';
+import {
+  expandHomeDir,
+  finishAddingDirectories,
+} from '../utils/directoryUtils.js';
 
 export const directoryCommand: SlashCommand = {
   name: 'directory',

@@ -4,11 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { loadServerHierarchicalMemory } from '@google/gemini-cli-core';
+import {
+  loadServerHierarchicalMemory,
+  type Config,
+} from '@google/gemini-cli-core';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { MessageType } from '../types.js';
-import type { CommandContext } from './types.js';
+import { MessageType, type HistoryItem } from '../types.js';
+import type { LoadedSettings } from '../../config/settings.js';
 
 export function expandHomeDir(p: string): string {
   if (!p) {
@@ -24,15 +27,14 @@ export function expandHomeDir(p: string): string {
 }
 
 export async function finishAddingDirectories(
-  context: CommandContext,
+  config: Config,
+  settings: LoadedSettings,
+  addItem: (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number) => number,
+  setGeminiMdFileCount: (count: number) => void,
   added: string[],
   errors: string[],
+  silentOnSuccess?: boolean,
 ) {
-  const {
-    ui: { addItem },
-    services: { config },
-  } = context;
-
   if (!config) {
     addItem(
       {
@@ -53,22 +55,24 @@ export async function finishAddingDirectories(
         config.getFileService(),
         config.getExtensionLoader(),
         config.getFolderTrust(),
-        context.services.settings.merged.context?.importFormat || 'tree',
+        settings.merged.context?.importFormat || 'tree',
         config.getFileFilteringOptions(),
-        context.services.settings.merged.context?.discoveryMaxDirs,
+        settings.merged.context?.discoveryMaxDirs,
       );
       config.setUserMemory(memoryContent);
       config.setGeminiMdFileCount(fileCount);
-      context.ui.setGeminiMdFileCount(fileCount);
-      addItem(
-        {
-          type: MessageType.INFO,
-          text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join(
-            '\n- ',
-          )}`,
-        },
-        Date.now(),
-      );
+      setGeminiMdFileCount(fileCount);
+      if (!silentOnSuccess) {
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join(
+              '\n- ',
+            )}`,
+          },
+          Date.now(),
+        );
+      }
     }
   } catch (error) {
     errors.push(`Error refreshing memory: ${(error as Error).message}`);
@@ -79,13 +83,15 @@ export async function finishAddingDirectories(
     if (gemini) {
       await gemini.addDirectoryContext();
     }
-    addItem(
-      {
-        type: MessageType.INFO,
-        text: `Successfully added directories:\n- ${added.join('\n- ')}`,
-      },
-      Date.now(),
-    );
+    if (!silentOnSuccess) {
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: `Successfully added directories:\n- ${added.join('\n- ')}`,
+        },
+        Date.now(),
+      );
+    }
   }
 
   if (errors.length > 0) {
